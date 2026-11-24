@@ -1,6 +1,5 @@
 const SUPABASE_URL = 'https://ghhcxldbwqmsgdyszwgg.supabase.co'
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Yzf_6I7J5SnU9p5U_Q1w8g_SuyjlPp7'
-const SHARED_EMAIL = 'salim.boukhari@sotutrasm.tn'
 const SESSION_KEY = 'brain365-supabase-session'
 const TABLE_URL = `${SUPABASE_URL}/rest/v1/brain365_state`
 
@@ -39,11 +38,10 @@ export function clearCloudSession() {
 }
 
 export async function signIn(login, password) {
-  if (login.trim().toLowerCase() !== 'sotutrasm' && login.trim().toLowerCase() !== SHARED_EMAIL) {
-    throw new Error('Login ou mot de passe incorrect.')
-  }
+  const email = login.trim().toLowerCase()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Saisis l’adresse e-mail du compte partagé.')
   const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: 'POST', headers: headers(), body: JSON.stringify({ email: SHARED_EMAIL, password }),
+    method: 'POST', headers: headers(), body: JSON.stringify({ email, password }),
   })
   const session = saveSession(await readResponse(response))
   return session

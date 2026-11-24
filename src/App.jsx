@@ -1310,7 +1310,7 @@ function CloudLogin({ onSuccess }) {
         <div className="demo-login-eyebrow">ESPACE DE TRAVAIL PARTAGÉ</div>
         <h1>Connexion</h1>
         <p className="demo-login-intro">Connecte-toi pour accéder aux données partagées de SOTUTRASM BRAIN 365.</p>
-        <label>Login<input name="username" autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} required /></label>
+        <label>Adresse e-mail<input name="username" type="email" autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} required /></label>
         <label>Mot de passe<input name="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
         {error && <p className="demo-login-error" role="alert">{error}</p>}
         <button type="submit" disabled={loading}>{loading ? 'Connexion…' : 'Se connecter'}</button>
