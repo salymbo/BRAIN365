@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import { applyCloudState, clearCloudSession, initializeCloudFromThisDevice, loadCloudState, restoreSession, signIn, startLocalStorageSync } from './cloudSync.js'
 
 const navItems = [
   { label: 'Vue générale', icon: '◫' },
@@ -1291,33 +1292,100 @@ function EnrochementModule() {
   )
 }
 
-function DemoLogin({ onSuccess }) {
+function CloudLogin({ onSuccess }) {
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const submit = (event) => {
+  const [loading, setLoading] = useState(false)
+  const submit = async (event) => {
     event.preventDefault()
-    if (login.trim().toLowerCase() === 'sotutrasm' && password === '2026') onSuccess()
-    else setError('Login ou mot de passe incorrect.')
+    setLoading(true)
+    setError('')
+    try { await onSuccess(login, password) } catch (cause) { setError(cause.message || 'Connexion impossible.') } finally { setLoading(false) }
   }
   return (
     <main className="demo-login-screen">
       <form className="demo-login-card" onSubmit={submit}>
         <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN 365</span></div></div>
-        <div className="demo-login-eyebrow">ESPACE DE TRAVAIL</div>
+        <div className="demo-login-eyebrow">ESPACE DE TRAVAIL PARTAGÉ</div>
         <h1>Connexion</h1>
-        <p className="demo-login-intro">Connecte-toi pour accéder à la plateforme de gestion.</p>
+        <p className="demo-login-intro">Connecte-toi pour accéder aux données partagées de SOTUTRASM BRAIN 365.</p>
         <label>Login<input name="username" autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} required /></label>
         <label>Mot de passe<input name="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
         {error && <p className="demo-login-error" role="alert">{error}</p>}
-        <button type="submit">Se connecter</button>
-        <small>Accès de démonstration partagé.</small>
+        <button type="submit" disabled={loading}>{loading ? 'Connexion…' : 'Se connecter'}</button>
+        <small>Compte partagé sécurisé par Supabase.</small>
       </form>
     </main>
   )
 }
+
+function CloudBootstrap({ session, onInitialized, onLogout }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const initialize = async () => {
+    setBusy(true)
+    setError('')
+    try { await initializeCloudFromThisDevice(session); await onInitialized() } catch (cause) { setError(cause.message || 'Initialisation impossible.') } finally { setBusy(false) }
+  }
+  return <main className="demo-login-screen"><section className="demo-login-card cloud-bootstrap-card">
+    <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN 365</span></div></div>
+    <div className="demo-login-eyebrow">INITIALISATION DU PARTAGE</div><h1>Aucune donnée partagée</h1>
+    <p className="demo-login-intro">Le compte est connecté, mais l’espace Supabase est encore vide. Depuis le PC qui contient les données de référence, clique ci-dessous pour envoyer les données de gestion de ce navigateur dans l’espace partagé.</p>
+    <button type="button" onClick={initialize} disabled={busy}>{busy ? 'Initialisation…' : 'Initialiser avec les données de ce PC'}</button>
+    {error && <p className="demo-login-error" role="alert">{error}</p>}
+    <button type="button" className="cloud-secondary-button" onClick={onLogout}>Se déconnecter</button>
+  </section></main>
+}
+
 function App() {
-  const [authenticated, setAuthenticated] = useState(() => sessionStorage.getItem('sotutrasm-demo-login') === 'ok')
+  const [authStatus, setAuthStatus] = useState('checking')
+  const [cloudSession, setCloudSession] = useState(null)
+  const [syncStatus, setSyncStatus] = useState('online')
+
+  const loadSessionData = async (session) => {
+    const data = await loadCloudState(session)
+    const hasCloudData = Object.keys(data).length > 0
+    if (hasCloudData) applyCloudState(data)
+    setCloudSession(session)
+    setAuthStatus(hasCloudData ? 'ready' : 'needsInit')
+  }
+
+  useEffect(() => {
+    let active = true
+    restoreSession().then(async (session) => {
+      if (!active) return
+      if (!session) { setAuthStatus('login'); return }
+      try { await loadSessionData(session) } catch (cause) {
+        if (active) { clearCloudSession(); setAuthStatus('login') }
+      }
+    })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (authStatus !== 'ready' || !cloudSession) return undefined
+    return startLocalStorageSync(cloudSession, setSyncStatus)
+  }, [authStatus, cloudSession])
+
+  const handleLogin = async (login, password) => {
+    const session = await signIn(login, password)
+    try { await loadSessionData(session) } catch (cause) { clearCloudSession(); setAuthStatus('login'); throw cause }
+  }
+  const logout = () => { clearCloudSession(); setCloudSession(null); setAuthStatus('login') }
+  const finishInitialization = async () => {
+    const data = await loadCloudState(cloudSession)
+    applyCloudState(data)
+    setAuthStatus('ready')
+  }
+
+  if (authStatus === 'checking') return <main className="demo-login-screen"><p>Connexion à l’espace partagé…</p></main>
+  if (authStatus === 'login') return <CloudLogin onSuccess={handleLogin} />
+  if (authStatus === 'needsInit') return <CloudBootstrap session={cloudSession} onInitialized={finishInitialization} onLogout={logout} />
+  return <DashboardApp onLogout={logout} syncStatus={syncStatus} />
+}
+
+function DashboardApp({ onLogout, syncStatus }) {
   const [activePage, setActivePage] = useState('Vue générale')
   const chantierOptions = ['Bizerte', 'Sidi Bousaid', 'Sidi Abdelhamid', 'Monastir']
   const [activeSite, setActiveSite] = useState(() => {
@@ -1341,8 +1409,6 @@ function App() {
   const dashboardTypeTotal = (type) => Number(enrochementBeforeAugust2026Tonnes[type] || 0) + dashboardEnrochementRecords.filter((record) => normalizeEnrochementType(record.type) === type).reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
   const dashboardOverallTonnage = Object.values(enrochementBeforeAugust2026Tonnes).reduce((sum, value) => sum + value, 0) + dashboardEnrochementRecords.reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
 
-  if (!authenticated) return <DemoLogin onSuccess={() => { sessionStorage.setItem('sotutrasm-demo-login', 'ok'); setAuthenticated(true) }} />
-
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -1365,14 +1431,14 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="profile"><div className="avatar">AM</div><div className="profile-copy"><strong>Admin SOTUTRASM</strong><span>Administrateur</span></div><button className="more" aria-label="Options du profil">···</button></div>
+          <div className="profile"><div className="avatar">SB</div><div className="profile-copy"><strong>Salim Boukhari</strong><span>Administrateur</span></div><button className="more" aria-label="Se déconnecter" onClick={onLogout}>↪</button></div>
         </div>
       </aside>
 
       <main className="main-area">
         <header className="topbar">
           <div className="breadcrumb">SOTUTRASM <span>/</span> <b>{activePage}</b></div>
-          <div className="top-actions"><span className="today">Mercredi 4 novembre 2026</span><button className="icon-button" aria-label="Notifications">♧<i /></button><div className="avatar small">AM</div></div>
+          <div className="top-actions"><span className={`cloud-sync-status ${syncStatus}`}><i />{syncStatus === 'syncing' ? 'Synchronisation…' : syncStatus === 'error' ? 'Synchronisation en erreur' : 'Données partagées'}</span><span className="today">Mercredi 4 novembre 2026</span><button className="icon-button" aria-label="Notifications">♧<i /></button><div className="avatar small">SB</div></div>
         </header>
 
         {activePage === 'Carburant' ? <FuelModule /> : activePage === 'Parc matériel' ? <FleetModule /> : activePage === 'Enrochement' ? <EnrochementModule /> : activePage === 'Compteurs horaires' ? <HourMeterModule /> : <div className="page-content">
