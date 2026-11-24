@@ -382,11 +382,10 @@ function FuelModule() {
 
   return (
     <div className="fuel-page">
-      <div className="fuel-title-row"><div><div className="eyebrow">GESTION DES OPÉRATIONS</div><h1>Carburant</h1><p>Consommation quotidienne par engin et historique des saisies.</p></div></div>
+      <div className="fuel-title-row"><div><div className="eyebrow">GESTION DES OPÉRATIONS</div><h1>Carburant</h1></div></div>
       <section className="panel fuel-gauge-panel">
-        <div className="fuel-gauge-copy"><div className="panel-header"><div><h2>Jauge du réservoir</h2><p>Niveau calculé avec le stock enregistré, les réceptions et les consommations.</p></div></div>
+        <div className="fuel-gauge-copy"><div className="panel-header"><div><h2>Jauge du réservoir</h2></div></div>
           <label>Capacité réelle du réservoir (L)<input type="number" min="1" step="1" placeholder="À renseigner" value={tankCapacity} onChange={(event) => { const value = event.target.value; setTankCapacity(value === '' ? '' : Number(value)); if (value === '') localStorage.removeItem('sotutrasm-fuel-tank-capacity'); else localStorage.setItem('sotutrasm-fuel-tank-capacity', String(Number(value))) }} /></label>
-          {tankLevel === null ? <p className="fuel-gauge-note">Saisissez la capacité indiquée sur votre réservoir pour afficher son pourcentage réel.</p> : <p className="fuel-gauge-note">Le niveau est plafonné à 100 % sur la jauge. Stock calculé : {numberFormat.format(currentStock)} L.</p>}
         </div>
         <div className="fuel-dial" role="img" aria-label={tankLevel === null ? `Stock actuel : ${numberFormat.format(currentStock)} litres. Capacité à renseigner.` : `Réservoir à ${numberFormat.format(tankLevel)} pour cent, ${numberFormat.format(currentStock)} litres sur ${numberFormat.format(Number(tankCapacity))}.`}>
           <svg viewBox="0 0 300 175" aria-hidden="true">
