@@ -1291,7 +1291,33 @@ function EnrochementModule() {
   )
 }
 
+function DemoLogin({ onSuccess }) {
+  const [login, setLogin] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const submit = (event) => {
+    event.preventDefault()
+    if (login.trim().toLowerCase() === 'sotutrasm' && password === '2026') onSuccess()
+    else setError('Login ou mot de passe incorrect.')
+  }
+  return (
+    <main className="demo-login-screen">
+      <form className="demo-login-card" onSubmit={submit}>
+        <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN 365</span></div></div>
+        <div className="demo-login-eyebrow">ESPACE DE TRAVAIL</div>
+        <h1>Connexion</h1>
+        <p className="demo-login-intro">Connecte-toi pour accéder à la plateforme de gestion.</p>
+        <label>Login<input name="username" autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} required /></label>
+        <label>Mot de passe<input name="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
+        {error && <p className="demo-login-error" role="alert">{error}</p>}
+        <button type="submit">Se connecter</button>
+        <small>Accès de démonstration partagé.</small>
+      </form>
+    </main>
+  )
+}
 function App() {
+  const [authenticated, setAuthenticated] = useState(() => sessionStorage.getItem('sotutrasm-demo-login') === 'ok')
   const [activePage, setActivePage] = useState('Vue générale')
   const chantierOptions = ['Bizerte', 'Sidi Bousaid', 'Sidi Abdelhamid', 'Monastir']
   const [activeSite, setActiveSite] = useState(() => {
@@ -1315,11 +1341,13 @@ function App() {
   const dashboardTypeTotal = (type) => Number(enrochementBeforeAugust2026Tonnes[type] || 0) + dashboardEnrochementRecords.filter((record) => normalizeEnrochementType(record.type) === type).reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
   const dashboardOverallTonnage = Object.values(enrochementBeforeAugust2026Tonnes).reduce((sum, value) => sum + value, 0) + dashboardEnrochementRecords.reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
 
+  if (!authenticated) return <DemoLogin onSuccess={() => { sessionStorage.setItem('sotutrasm-demo-login', 'ok'); setAuthenticated(true) }} />
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark"><img src="/headerlogo.png" alt="Logo SOTUTRASM" /></div>
+          <div className="brand-mark"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /></div>
           <div><strong>SOTUTRASM</strong><span>BRAIN 365</span><small className="brand-credit">Developed by <b>SALIM-B</b> 2026 ©</small></div>
         </div>
         <div className="workspace-label">CHANTIER</div>
