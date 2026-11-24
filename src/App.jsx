@@ -1403,7 +1403,7 @@ function CloudLogin({ onSuccess }) {
   return (
     <main className="demo-login-screen">
       <form className="demo-login-card" onSubmit={submit}>
-        <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN365</span></div></div>
+        <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN 365</span></div></div>
         <div className="demo-login-eyebrow">ESPACE DE TRAVAIL PARTAGÉ</div>
         <h1>Connexion</h1>
         <p className="demo-login-intro">Connecte-toi pour accéder aux données partagées de SOTUTRASM BRAIN 365.</p>
@@ -1426,7 +1426,7 @@ function CloudBootstrap({ session, onInitialized, onLogout }) {
     try { await initializeCloudFromThisDevice(session); await onInitialized() } catch (cause) { setError(cause.message || 'Initialisation impossible.') } finally { setBusy(false) }
   }
   return <main className="demo-login-screen"><section className="demo-login-card cloud-bootstrap-card">
-    <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN365</span></div></div>
+    <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN 365</span></div></div>
     <div className="demo-login-eyebrow">INITIALISATION DU PARTAGE</div><h1>Aucune donnée partagée</h1>
     <p className="demo-login-intro">Le compte est connecté, mais l’espace Supabase est encore vide. Depuis le PC qui contient les données de référence, clique ci-dessous pour envoyer les données de gestion de ce navigateur dans l’espace partagé.</p>
     <button type="button" onClick={initialize} disabled={busy}>{busy ? 'Initialisation…' : 'Initialiser avec les données de ce PC'}</button>
