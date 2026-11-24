@@ -9,6 +9,7 @@ export const syncedStorageKeys = [
   'sotutrasm-reservoir-baseline',
   'sotutrasm-fuel-tank-capacity',
   'sotutrasm-fuel-stock',
+  'sotutrasm-custom-drivers',
   'sotutrasm-fleet-assets',
   'sotutrasm-hourmeter-readings',
   'sotutrasm-enrochement-trips',

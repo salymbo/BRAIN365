@@ -50,6 +50,7 @@ function BizerteWeather() {
 
 const fuelStorageKey = 'sotutrasm-fuel-records'
 const deliveryStorageKey = 'sotutrasm-fuel-deliveries'
+const driverStorageKey = 'sotutrasm-custom-drivers'
 const confirmedMonthlyFuelTotals = { '2026-03': 2101, '2026-04': 6856, '2026-05': 8057, '2026-06': 12045, '2026-07': 2664, '2026-08': 782, '2026-09': 9257, '2026-10': 9048, '2026-11': 1756 }
 const enrochementBeforeAugust2026Tonnes = { '1/500': 22465.76, '1/3T': 9338.79 }
 
@@ -142,6 +143,11 @@ function readReservoirBaseline() {
 
 function FuelModule() {
   const [records, setRecords] = useState(loadFuelRecords)
+  const [customDrivers, setCustomDrivers] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(driverStorageKey) || '[]').filter((driver) => typeof driver === 'string') } catch { return [] }
+  })
+  const [newDriverName, setNewDriverName] = useState('')
+  const [driverMessage, setDriverMessage] = useState('')
   const [reservoirBaseline, setReservoirBaseline] = useState(loadReservoirBaseline)
   const [tankCapacity, setTankCapacity] = useState(() => {
     const saved = Number(localStorage.getItem('sotutrasm-fuel-tank-capacity'))
@@ -175,13 +181,35 @@ function FuelModule() {
     const additionalDrivers = [...records.map((record) => record.driver), ...fleetAssets.map((asset) => asset.responsible)]
       .filter((name) => name && name !== '—').map((name) => name.trim()).filter(Boolean)
       .sort((a, b) => a.localeCompare(b, 'fr'))
-    return [...new Set([...defaultFuelDrivers, ...additionalDrivers])]
+    return [...new Set([...defaultFuelDrivers, ...customDrivers, ...additionalDrivers])].sort((a, b) => a.localeCompare(b, 'fr'))
   })()
   const editingRecord = records.find((record) => record.id === editingRecordId)
 
   useEffect(() => {
     localStorage.setItem(fuelStorageKey, JSON.stringify(records))
   }, [records])
+
+  useEffect(() => {
+    localStorage.setItem(driverStorageKey, JSON.stringify(customDrivers))
+  }, [customDrivers])
+
+  function addDriver(event) {
+    event.preventDefault()
+    const name = newDriverName.trim().replace(/\s+/g, ' ')
+    if (!name) return
+    if (fuelDriverOptions.some((driver) => driver.toLocaleLowerCase('fr') === name.toLocaleLowerCase('fr'))) {
+      setDriverMessage('Ce chauffeur figure déjà dans la liste.')
+      return
+    }
+    setCustomDrivers((current) => [...current, name].sort((a, b) => a.localeCompare(b, 'fr')))
+    setNewDriverName('')
+    setDriverMessage(`${name} a été ajouté à la liste.`)
+  }
+
+  function removeDriver(name) {
+    setCustomDrivers((current) => current.filter((driver) => driver !== name))
+    setDriverMessage(`${name} a été retiré de la liste personnalisée. Il peut rester proposé s’il figure dans une ancienne consommation ou dans le parc matériel.`)
+  }
 
   useEffect(() => {
     if (stockSnapshot) localStorage.setItem('sotutrasm-fuel-stock', JSON.stringify(stockSnapshot))
@@ -380,6 +408,16 @@ function FuelModule() {
           <div className="form-actions">{saved && <span className="save-confirmation">✓ Consommation enregistrée</span>}<button type="submit" className="primary-button">＋ Ajouter la consommation</button></div>
         </form>
         {importMessage && <p className="import-message" role="status">{importMessage}</p>}
+      </section>
+      <section className="panel driver-manager-panel">
+        <div className="panel-header"><div><h2>Gérer les chauffeurs</h2><p>Ajoute un nom pour le retrouver dans la liste de saisie carburant.</p></div></div>
+        <form className="driver-manager-form" onSubmit={addDriver}>
+          <label htmlFor="new-fuel-driver">Nom du chauffeur</label>
+          <input id="new-fuel-driver" value={newDriverName} onChange={(event) => setNewDriverName(event.target.value)} placeholder="Ex. Mohamed Ben Ali" />
+          <button type="submit" className="primary-button">＋ Ajouter un chauffeur</button>
+        </form>
+        {driverMessage && <p className="import-message" role="status">{driverMessage}</p>}
+        {customDrivers.length > 0 && <div className="driver-manager-list"><strong>Chauffeurs ajoutés</strong>{customDrivers.map((driver) => <div className="driver-manager-row" key={driver}><span>{driver}</span><button type="button" className="delete-asset" onClick={() => removeDriver(driver)}>Retirer</button></div>)}</div>}
       </section>
       <section className="panel delivery-panel">
         <div className="panel-header"><div><h2>Enregistrer une réception de gasoil</h2><p>Une livraison augmente le stock disponible à partir de la quantité saisie.</p></div></div>
