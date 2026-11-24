@@ -349,7 +349,7 @@ function FuelModule() {
         <div className="fuel-dial" role="img" aria-label={tankLevel === null ? `Stock actuel : ${numberFormat.format(currentStock)} litres. Capacité à renseigner.` : `Réservoir à ${numberFormat.format(tankLevel)} pour cent, ${numberFormat.format(currentStock)} litres sur ${numberFormat.format(Number(tankCapacity))}.`}>
           <svg viewBox="0 0 300 175" aria-hidden="true">
             <path className="fuel-dial-track" d="M 38 145 A 112 112 0 0 1 262 145" />
-            <path className={`fuel-dial-fill ${stockLevelClass}`} d="M 38 145 A 112 112 0 0 1 262 145" pathLength="100" strokeDasharray={tankLevel === null ? 0 : tankLevel} />
+            <path className={`fuel-dial-fill ${stockLevelClass}`} d="M 38 145 A 112 112 0 0 1 262 145" pathLength="100" strokeDasharray={tankLevel === null ? '0 100' : `${tankLevel} 100`} />
             {[0, 25, 50, 75, 100].map((tick) => { const angle = Math.PI - tick / 100 * Math.PI; const x = 150 + Math.cos(angle) * 126; const y = 145 - Math.sin(angle) * 126; return <text key={tick} x={x} y={y} className="fuel-dial-tick">{tick}</text> })}
             {tankLevel !== null && <g transform={`rotate(${-90 + tankLevel * 1.8} 150 145)`}><line x1="150" y1="145" x2="150" y2="47" className="fuel-dial-needle" /><circle cx="150" cy="145" r="6" className="fuel-dial-hub" /></g>}
           </svg>
