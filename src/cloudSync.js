@@ -103,7 +103,10 @@ export async function importCloudBackup(session, backup) {
   if (backup?.format !== 'brain365-local-backup' || !backup.data || typeof backup.data !== 'object' || Array.isArray(backup.data)) {
     throw new Error('Ce fichier n’est pas une sauvegarde SOTUTRASM BRAIN 365 valide.')
   }
-  const rows = syncedStorageKeys.map((key) => ({ key, value: Object.prototype.hasOwnProperty.call(backup.data, key) ? backup.data[key] : null }))
+  const rows = Object.entries(backup.data)
+    .filter(([key]) => syncedStorageKeys.includes(key))
+    .map(([key, value]) => ({ key, value }))
+  if (!rows.length) throw new Error('La sauvegarde ne contient aucune donnée reconnue.')
   const response = await fetch(`${TABLE_URL}?on_conflict=key`, {
     method: 'POST', headers: { ...headers(session.access_token), Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify(rows),
