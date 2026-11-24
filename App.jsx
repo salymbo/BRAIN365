@@ -1314,7 +1314,7 @@ function DemoLogin({ onSuccess }) {
   return (
     <main className="demo-login-screen">
       <form className="demo-login-card" onSubmit={submit}>
-        <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN 365</span></div></div>
+        <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN365</span></div></div>
         <div className="demo-login-eyebrow">ESPACE DE TRAVAIL</div>
         <h1>Connexion</h1>
         <p className="demo-login-intro">Connecte-toi pour accéder à la plateforme de gestion.</p>
