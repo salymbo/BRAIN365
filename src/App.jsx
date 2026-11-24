@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
-import { applyCloudState, clearCloudSession, initializeCloudFromThisDevice, loadCloudState, restoreSession, signIn, startLocalStorageSync } from './cloudSync.js'
+import { applyCloudState, clearCloudSession, importCloudBackup, initializeCloudFromThisDevice, loadCloudState, restoreSession, signIn, startLocalStorageSync } from './cloudSync.js'
 
 const navItems = [
   { label: 'Vue générale', icon: '◫' },
@@ -1382,11 +1382,13 @@ function App() {
   if (authStatus === 'checking') return <main className="demo-login-screen"><p>Connexion à l’espace partagé…</p></main>
   if (authStatus === 'login') return <CloudLogin onSuccess={handleLogin} />
   if (authStatus === 'needsInit') return <CloudBootstrap session={cloudSession} onInitialized={finishInitialization} onLogout={logout} />
-  return <DashboardApp onLogout={logout} syncStatus={syncStatus} />
+  return <DashboardApp session={cloudSession} onLogout={logout} syncStatus={syncStatus} />
 }
 
-function DashboardApp({ onLogout, syncStatus }) {
+function DashboardApp({ session, onLogout, syncStatus }) {
   const [activePage, setActivePage] = useState('Vue générale')
+  const [backupImportStatus, setBackupImportStatus] = useState('')
+  const [backupImporting, setBackupImporting] = useState(false)
   const chantierOptions = ['Bizerte', 'Sidi Bousaid', 'Sidi Abdelhamid', 'Monastir']
   const [activeSite, setActiveSite] = useState(() => {
     const savedSite = localStorage.getItem('sotutrasm-active-site')
@@ -1408,6 +1410,24 @@ function DashboardApp({ onLogout, syncStatus }) {
   const numberFormat = new Intl.NumberFormat('fr-TN', { maximumFractionDigits: 3 })
   const dashboardTypeTotal = (type) => Number(enrochementBeforeAugust2026Tonnes[type] || 0) + dashboardEnrochementRecords.filter((record) => normalizeEnrochementType(record.type) === type).reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
   const dashboardOverallTonnage = Object.values(enrochementBeforeAugust2026Tonnes).reduce((sum, value) => sum + value, 0) + dashboardEnrochementRecords.reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
+
+  const importBackupFile = async (event) => {
+    const input = event.currentTarget
+    const file = input.files?.[0]
+    if (!file) return
+    setBackupImporting(true)
+    setBackupImportStatus('Import de la sauvegarde…')
+    try {
+      const backup = JSON.parse(await file.text())
+      await importCloudBackup(session, backup)
+      window.location.reload()
+    } catch (error) {
+      setBackupImportStatus(error.message || 'Import impossible.')
+    } finally {
+      setBackupImporting(false)
+      input.value = ''
+    }
+  }
 
   return (
     <div className="app-shell">
@@ -1431,6 +1451,8 @@ function DashboardApp({ onLogout, syncStatus }) {
           ))}
         </nav>
         <div className="sidebar-bottom">
+          <label className="cloud-import-button">{backupImporting ? 'Import en cours…' : 'Importer une sauvegarde locale'}<input type="file" accept="application/json,.json" disabled={backupImporting} onChange={importBackupFile} /></label>
+          {backupImportStatus && <small className="cloud-import-status" role="status">{backupImportStatus}</small>}
           <div className="profile"><div className="avatar">SB</div><div className="profile-copy"><strong>Salim Boukhari</strong><span>Administrateur</span></div><button className="more" aria-label="Se déconnecter" onClick={onLogout}>↪</button></div>
         </div>
       </aside>

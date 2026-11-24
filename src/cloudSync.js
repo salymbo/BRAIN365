@@ -99,6 +99,19 @@ export async function initializeCloudFromThisDevice(session) {
   return rows.length
 }
 
+export async function importCloudBackup(session, backup) {
+  if (backup?.format !== 'brain365-local-backup' || !backup.data || typeof backup.data !== 'object' || Array.isArray(backup.data)) {
+    throw new Error('Ce fichier n’est pas une sauvegarde SOTUTRASM BRAIN 365 valide.')
+  }
+  const rows = syncedStorageKeys.map((key) => ({ key, value: Object.prototype.hasOwnProperty.call(backup.data, key) ? backup.data[key] : null }))
+  const response = await fetch(`${TABLE_URL}?on_conflict=key`, {
+    method: 'POST', headers: { ...headers(session.access_token), Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(rows),
+  })
+  await readResponse(response)
+  return rows.length
+}
+
 export function startLocalStorageSync(session, onStatus) {
   const originalSet = Storage.prototype.setItem
   const originalRemove = Storage.prototype.removeItem
