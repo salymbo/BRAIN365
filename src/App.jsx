@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
-import { applyCloudState, clearCloudSession, importCloudBackup, initializeCloudFromThisDevice, loadCloudState, restoreSession, signIn, startLocalStorageSync } from './cloudSync.js'
+import { applyCloudState, clearCloudSession, importCloudBackup, initializeCloudFromThisDevice, loadCloudState, markCloudWritePending, restoreSession, signIn, startLocalStorageSync } from './cloudSync.js'
 
 const navItems = [
   { label: 'Vue générale', icon: '◫' },
@@ -53,6 +53,12 @@ const deliveryStorageKey = 'sotutrasm-fuel-deliveries'
 const driverStorageKey = 'sotutrasm-custom-drivers'
 const confirmedMonthlyFuelTotals = { '2026-03': 2101, '2026-04': 6856, '2026-05': 8057, '2026-06': 12045, '2026-07': 2664, '2026-08': 782, '2026-09': 9257, '2026-10': 9048, '2026-11': 1756 }
 const enrochementBeforeAugust2026Tonnes = { '1/500': 22465.76, '1/3T': 9338.79 }
+const enrochementVerifiedBaseline = {
+  // Excel-verified cumulative figures through 24 November 2026.
+  recordedAfter: '2026-11-24T23:00:00.000Z',
+  cumulativeSinceAugust: { '1/500': 46837.258, '1/3T': 17836.028, '25/40': 32.44 },
+  november: { '1/500': 8207.118, '1/3T': 3595.790, '25/40': 32.440, trips500: 228, trips3T: 107, trips2540: 1, trips: 336 },
+}
 
 function fuelMonthlyTotal(records, baseline, key) {
   const parsedBaselineTime = Date.parse(baseline.baselineAt || '')
@@ -1113,6 +1119,7 @@ function EnrochementModule() {
       tonnageKg: Number(form.get('tonnageKg')),
       site: form.get('site').trim(),
       sourceFile: 'Saisie manuelle',
+      recordedAt: new Date().toISOString(),
     }
     trip.id = 'manual|' + crypto.randomUUID()
     setRecords((current) => [trip, ...current])
@@ -1201,6 +1208,7 @@ function EnrochementModule() {
         const vehicle = splitEnrochementPlateAndDriver(sourcePlate)
         const record = { date: parsedDate, time: get('time'), casa: get('casa'), transport: get('transport'), type: normalizeEnrochementType(get('type')), plate: vehicle.plate, driver: get('driver') || vehicle.driver, tonnageKg, site: get('site') }
         record.sourceFile = file.name
+        if (record.date > '2026-11-24') record.recordedAt = new Date().toISOString()
         record.id = enrochementTripKey(record)
         return record
       }).filter(Boolean)
@@ -1223,22 +1231,34 @@ function EnrochementModule() {
     const searchText = [record.date, record.casa, record.transport, record.type, record.plate, record.driver, record.site].join(' ').toLocaleLowerCase('fr')
     return (monthFilter === 'Tous les mois' || record.date.startsWith(monthFilter)) && searchText.includes(search.toLocaleLowerCase('fr'))
   }).sort((a, b) => b.date.localeCompare(a.date) || b.casa.localeCompare(a.casa))
-  const totalTonnageByTypeSinceStart = (type) => Number(enrochementBeforeAugust2026Tonnes[type] || 0) + records.filter((record) => record.type === type).reduce((sum, record) => sum + record.tonnageKg, 0) / 1000
+  const newRecordsAfterVerifiedBaseline = records.filter((record) => record.recordedAt && Date.parse(record.recordedAt) >= Date.parse(enrochementVerifiedBaseline.recordedAfter))
+  const totalTonnageByTypeSinceStart = (type) => Number(enrochementVerifiedBaseline.cumulativeSinceAugust[type] || 0) + newRecordsAfterVerifiedBaseline.filter((record) => normalizeEnrochementType(record.type) === type).reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
   const monthlySummaryRows = [...new Set(records.map((record) => record.date?.slice(0, 7)).filter(Boolean))].sort().reverse().map((key) => {
     const monthRecords = records.filter((record) => record.date.startsWith(key))
     const tonnesByType = (type) => monthRecords.filter((record) => normalizeEnrochementType(record.type) === type).reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
-    return { key, label: `${monthLabels[key.slice(5, 7)]} ${key.slice(0, 4)}`, tonnes500: tonnesByType('1/500'), tonnes3T: tonnesByType('1/3T'), tonnes2540: tonnesByType('25/40'), totalTonnes: monthRecords.reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000, trips500: monthRecords.filter((record) => normalizeEnrochementType(record.type) === '1/500').length, trips3T: monthRecords.filter((record) => normalizeEnrochementType(record.type) === '1/3T').length, trips2540: monthRecords.filter((record) => normalizeEnrochementType(record.type) === '25/40').length, trips: monthRecords.length }
+    const november = key === '2026-11'
+    const postBaseline = november ? monthRecords.filter((record) => record.recordedAt && Date.parse(record.recordedAt) >= Date.parse(enrochementVerifiedBaseline.recordedAfter)) : []
+    const verifiedTonnes = (type) => Number(enrochementVerifiedBaseline.november[type] || 0) + postBaseline.filter((record) => normalizeEnrochementType(record.type) === type).reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
+    const tonnes500 = november ? verifiedTonnes('1/500') : tonnesByType('1/500')
+    const tonnes3T = november ? verifiedTonnes('1/3T') : tonnesByType('1/3T')
+    const tonnes2540 = november ? verifiedTonnes('25/40') : tonnesByType('25/40')
+    const trips500 = november ? enrochementVerifiedBaseline.november.trips500 + postBaseline.filter((record) => normalizeEnrochementType(record.type) === '1/500').length : monthRecords.filter((record) => normalizeEnrochementType(record.type) === '1/500').length
+    const trips3T = november ? enrochementVerifiedBaseline.november.trips3T + postBaseline.filter((record) => normalizeEnrochementType(record.type) === '1/3T').length : monthRecords.filter((record) => normalizeEnrochementType(record.type) === '1/3T').length
+    const trips2540 = november ? enrochementVerifiedBaseline.november.trips2540 + postBaseline.filter((record) => normalizeEnrochementType(record.type) === '25/40').length : monthRecords.filter((record) => normalizeEnrochementType(record.type) === '25/40').length
+    const trips = november ? enrochementVerifiedBaseline.november.trips + postBaseline.length : monthRecords.length
+    return { key, label: `${monthLabels[key.slice(5, 7)]} ${key.slice(0, 4)}`, tonnes500, tonnes3T, tonnes2540, totalTonnes: tonnes500 + tonnes3T + tonnes2540, trips500, trips3T, trips2540, trips }
   })
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize))
   const visibleRecords = filteredRecords.slice((page - 1) * pageSize, page * pageSize)
   const editingTrip = records.find((record) => record.id === editingTripId)
   const numberFormat = new Intl.NumberFormat('fr-TN', { maximumFractionDigits: 3 })
-  const overallTonnage = Object.values(enrochementBeforeAugust2026Tonnes).reduce((sum, value) => sum + value, 0) + records.reduce((sum, record) => sum + record.tonnageKg, 0) / 1000
+  const overallTonnage = Object.values(enrochementVerifiedBaseline.cumulativeSinceAugust).reduce((sum, value) => sum + value, 0) + newRecordsAfterVerifiedBaseline.reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
   const monthlyTotals = [
     { key: 'before-2026-08', label: 'Avant août 2026', trips: null, tonnes500: enrochementBeforeAugust2026Tonnes['1/500'], tonnes3T: enrochementBeforeAugust2026Tonnes['1/3T'], tonnes2540: 0 },
     ...[...new Set(records.map((record) => record.date.slice(0, 7)))].sort().map((key) => {
       const monthRecords = records.filter((record) => record.date.startsWith(key))
-      return { key, label: `${monthLabels[key.slice(5, 7)]} ${key.slice(0, 4)}`, trips: monthRecords.length, tonnes500: monthRecords.filter((record) => record.type === '1/500').reduce((sum, record) => sum + record.tonnageKg, 0) / 1000, tonnes3T: monthRecords.filter((record) => record.type === '1/3T').reduce((sum, record) => sum + record.tonnageKg, 0) / 1000, tonnes2540: monthRecords.filter((record) => record.type === '25/40').reduce((sum, record) => sum + record.tonnageKg, 0) / 1000 }
+      const totals = monthlySummaryRows.find((month) => month.key === key)
+      return { key, label: `${monthLabels[key.slice(5, 7)]} ${key.slice(0, 4)}`, trips: totals?.trips ?? monthRecords.length, tonnes500: totals?.tonnes500 ?? 0, tonnes3T: totals?.tonnes3T ?? 0, tonnes2540: totals?.tonnes2540 ?? 0 }
     })
   ]
   const maxMonthlyTonnes = Math.max(1, ...monthlyTotals.flatMap((month) => [month.tonnes500, month.tonnes3T, month.tonnes2540]))
@@ -1258,6 +1278,11 @@ function EnrochementModule() {
   for (const [type, tonnes] of Object.entries(enrochementBeforeAugust2026Tonnes)) {
     const typeStats = typeMap.get(type) || { type, trips: 0, tonnageKg: 0 }
     typeStats.tonnageKg += tonnes * 1000
+    typeMap.set(type, typeStats)
+  }
+  for (const [type, tonnes] of Object.entries(enrochementVerifiedBaseline.cumulativeSinceAugust)) {
+    const typeStats = typeMap.get(type) || { type, trips: 0, tonnageKg: 0 }
+    typeStats.tonnageKg = (tonnes + newRecordsAfterVerifiedBaseline.filter((record) => normalizeEnrochementType(record.type) === type).reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000) * 1000
     typeMap.set(type, typeStats)
   }
   for (const record of filteredRecords) {
@@ -1402,9 +1427,21 @@ function App() {
   const [authStatus, setAuthStatus] = useState('checking')
   const [cloudSession, setCloudSession] = useState(null)
   const [syncStatus, setSyncStatus] = useState('online')
+  const [syncError, setSyncError] = useState('')
 
   const loadSessionData = async (session) => {
     const data = await loadCloudState(session)
+    const enrochementKey = 'sotutrasm-enrochement-trips'
+    let localEnrochement = []
+    try { localEnrochement = JSON.parse(localStorage.getItem(enrochementKey) || '[]') } catch { localEnrochement = [] }
+    const cloudEnrochement = Array.isArray(data[enrochementKey]) ? data[enrochementKey] : []
+    if (localEnrochement.length) {
+      const mergedEnrochement = normalizeEnrochementRecords([...cloudEnrochement, ...localEnrochement])
+      if (mergedEnrochement.length > cloudEnrochement.length) {
+        data[enrochementKey] = mergedEnrochement
+        markCloudWritePending(enrochementKey, mergedEnrochement)
+      }
+    }
     const hasCloudData = Object.keys(data).length > 0
     if (hasCloudData) applyCloudState(data)
     setCloudSession(session)
@@ -1425,7 +1462,7 @@ function App() {
 
   useEffect(() => {
     if (authStatus !== 'ready' || !cloudSession) return undefined
-    return startLocalStorageSync(cloudSession, setSyncStatus)
+    return startLocalStorageSync(cloudSession, (status, message = '') => { setSyncStatus(status); setSyncError(message) })
   }, [authStatus, cloudSession])
 
   const handleLogin = async (login, password) => {
@@ -1442,10 +1479,10 @@ function App() {
   if (authStatus === 'checking') return <main className="demo-login-screen"><p>Connexion à l’espace partagé…</p></main>
   if (authStatus === 'login') return <CloudLogin onSuccess={handleLogin} />
   if (authStatus === 'needsInit') return <CloudBootstrap session={cloudSession} onInitialized={finishInitialization} onLogout={logout} />
-  return <DashboardApp session={cloudSession} onLogout={logout} syncStatus={syncStatus} />
+  return <DashboardApp session={cloudSession} onLogout={logout} syncStatus={syncStatus} syncError={syncError} />
 }
 
-function DashboardApp({ session, onLogout, syncStatus }) {
+function DashboardApp({ session, onLogout, syncStatus, syncError }) {
   const [activePage, setActivePage] = useState('Vue générale')
   const [backupImportStatus, setBackupImportStatus] = useState('')
   const [backupImporting, setBackupImporting] = useState(false)
@@ -1469,8 +1506,9 @@ function DashboardApp({ session, onLogout, syncStatus }) {
   const stockLevelClass = currentStock > 6000 ? 'stock-level-high' : currentStock >= 4000 ? 'stock-level-medium' : 'stock-level-low'
   const latestPumpIndexRecord = [...dashboardRecords].filter((record) => record.pumpIndex !== null && record.pumpIndex !== '' && Number.isFinite(Number(record.pumpIndex))).sort((a, b) => b.date.localeCompare(a.date) || Date.parse(b.recordedAt || 0) - Date.parse(a.recordedAt || 0))[0]
   const numberFormat = new Intl.NumberFormat('fr-TN', { maximumFractionDigits: 3 })
-  const dashboardTypeTotal = (type) => Number(enrochementBeforeAugust2026Tonnes[type] || 0) + dashboardEnrochementRecords.filter((record) => normalizeEnrochementType(record.type) === type).reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
-  const dashboardOverallTonnage = Object.values(enrochementBeforeAugust2026Tonnes).reduce((sum, value) => sum + value, 0) + dashboardEnrochementRecords.reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
+  const dashboardEnrochementIncrement = dashboardEnrochementRecords.filter((record) => record.recordedAt && Date.parse(record.recordedAt) >= Date.parse(enrochementVerifiedBaseline.recordedAfter))
+  const dashboardTypeTotal = (type) => Number(enrochementVerifiedBaseline.cumulativeSinceAugust[type] || 0) + dashboardEnrochementIncrement.filter((record) => normalizeEnrochementType(record.type) === type).reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
+  const dashboardOverallTonnage = Object.values(enrochementVerifiedBaseline.cumulativeSinceAugust).reduce((sum, value) => sum + value, 0) + dashboardEnrochementIncrement.reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
 
   const importBackupFile = async (event) => {
     const input = event.currentTarget
@@ -1521,7 +1559,7 @@ function DashboardApp({ session, onLogout, syncStatus }) {
       <main className="main-area">
         <header className="topbar">
           <div className="breadcrumb">SOTUTRASM <span>/</span> <b>{activePage}</b></div>
-          <div className="top-actions"><span className={`cloud-sync-status ${syncStatus}`}><i />{syncStatus === 'syncing' ? 'Synchronisation…' : syncStatus === 'error' ? 'Synchronisation en erreur' : 'Données partagées'}</span><span className="today">Mercredi 4 novembre 2026</span><button className="icon-button" aria-label="Notifications">♧<i /></button><div className="avatar small">SB</div></div>
+          <div className="top-actions"><span className={`cloud-sync-status ${syncStatus}`} title={syncError || undefined} aria-label={syncError ? `Synchronisation en erreur : ${syncError}` : undefined}><i />{syncStatus === 'syncing' ? 'Synchronisation…' : syncStatus === 'error' ? 'Synchronisation en erreur' : 'Données partagées'}</span><span className="today">Mercredi 4 novembre 2026</span><button className="icon-button" aria-label="Notifications">♧<i /></button><div className="avatar small">SB</div></div>
         </header>
 
         {activePage === 'Carburant' ? <FuelModule /> : activePage === 'Parc matériel' ? <FleetModule /> : activePage === 'Enrochement' ? <EnrochementModule /> : activePage === 'Compteurs horaires' ? <HourMeterModule /> : <div className="page-content">

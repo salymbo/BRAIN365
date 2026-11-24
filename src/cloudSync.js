@@ -1,6 +1,7 @@
 const SUPABASE_URL = 'https://ghhcxldbwqmsgdyszwgg.supabase.co'
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Yzf_6I7J5SnU9p5U_Q1w8g_SuyjlPp7'
 const SESSION_KEY = 'brain365-supabase-session'
+const PENDING_SYNC_KEY = 'brain365-pending-cloud-sync'
 const TABLE_URL = `${SUPABASE_URL}/rest/v1/brain365_state`
 
 export const syncedStorageKeys = [
@@ -76,13 +77,29 @@ export async function loadCloudState(session) {
 }
 
 export function applyCloudState(cloudState) {
+  let pending = {}
+  try { pending = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || '{}') } catch { pending = {} }
   syncedStorageKeys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(pending, key)) {
+      const queued = pending[key]
+      if (queued.removed) localStorage.removeItem(key)
+      else localStorage.setItem(key, JSON.stringify(queued.value))
+      return
+    }
     if (Object.prototype.hasOwnProperty.call(cloudState, key)) {
       const value = cloudState[key]
       if (value === null) localStorage.removeItem(key)
       else localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value))
     } else localStorage.removeItem(key)
   })
+}
+
+export function markCloudWritePending(key, value) {
+  if (!syncedStorageKeys.includes(key)) return
+  let pending = {}
+  try { pending = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || '{}') } catch { pending = {} }
+  pending[key] = { value, removed: false }
+  localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(pending))
 }
 
 export async function initializeCloudFromThisDevice(session) {
@@ -117,26 +134,40 @@ export async function importCloudBackup(session, backup) {
 }
 
 export function startLocalStorageSync(session, onStatus) {
+  const originalGet = Storage.prototype.getItem
   const originalSet = Storage.prototype.setItem
   const originalRemove = Storage.prototype.removeItem
   const writes = new Map()
   let stopped = false
+
+  const readPending = () => {
+    try { return JSON.parse(originalGet.call(localStorage, PENDING_SYNC_KEY) || '{}') } catch { return {} }
+  }
+  const savePending = (pending) => originalSet.call(localStorage, PENDING_SYNC_KEY, JSON.stringify(pending))
 
   const schedule = (key, value, removed = false) => {
     if (!syncedStorageKeys.includes(key)) return
     const operation = async () => {
       if (stopped) return
       onStatus('syncing')
+      const currentSession = await restoreSession()
+      if (!currentSession?.access_token) throw new Error('Session expirée. Reconnecte-toi pour synchroniser les données.')
       const response = removed
-        ? await fetch(`${TABLE_URL}?key=eq.${encodeURIComponent(key)}`, { method: 'DELETE', headers: headers(session.access_token), keepalive: true })
+        ? await fetch(`${TABLE_URL}?key=eq.${encodeURIComponent(key)}`, { method: 'DELETE', headers: headers(currentSession.access_token), keepalive: true })
         : await fetch(`${TABLE_URL}?on_conflict=key`, {
-          method: 'POST', headers: { ...headers(session.access_token), Prefer: 'resolution=merge-duplicates,return=minimal' },
+          method: 'POST', headers: { ...headers(currentSession.access_token), Prefer: 'resolution=merge-duplicates,return=minimal' },
           body: JSON.stringify([{ key, value }]), keepalive: true,
         })
       await readResponse(response)
+      const pending = readPending()
+      const queued = pending[key]
+      if (queued && queued.removed === removed && (removed || JSON.stringify(queued.value) === JSON.stringify(value))) {
+        delete pending[key]
+        savePending(pending)
+      }
       if (!stopped) onStatus('online')
     }
-    const next = (writes.get(key) || Promise.resolve()).catch(() => {}).then(operation).catch(() => { if (!stopped) onStatus('error') })
+    const next = (writes.get(key) || Promise.resolve()).catch(() => {}).then(operation).catch((error) => { if (!stopped) onStatus('error', error.message || 'Erreur inconnue') })
     writes.set(key, next)
   }
 
@@ -145,13 +176,26 @@ export function startLocalStorageSync(session, onStatus) {
     if (this === localStorage && syncedStorageKeys.includes(String(key))) {
       let parsed = value
       try { parsed = JSON.parse(value) } catch { /* keep text values as text */ }
+      const pending = readPending()
+      pending[String(key)] = { value: parsed, removed: false }
+      savePending(pending)
       schedule(String(key), parsed)
     }
   }
   Storage.prototype.removeItem = function (key) {
     originalRemove.call(this, key)
-    if (this === localStorage) schedule(String(key), null, true)
+    if (this === localStorage && syncedStorageKeys.includes(String(key))) {
+      const pending = readPending()
+      pending[String(key)] = { value: null, removed: true }
+      savePending(pending)
+      schedule(String(key), null, true)
+    }
   }
+
+  const pending = readPending()
+  Object.entries(pending).forEach(([key, queued]) => {
+    if (syncedStorageKeys.includes(key)) schedule(key, queued.value, queued.removed)
+  })
 
   return () => {
     stopped = true
