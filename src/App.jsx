@@ -234,6 +234,7 @@ function FuelModule() {
       ficheConso: form.get('ficheConso').trim(),
       liters: Number(form.get('liters')),
       pumpIndex: form.get('pumpIndex') === '' ? null : Number(form.get('pumpIndex')),
+      hourmeterCounter: form.get('hourmeterCounter') === '' ? null : Number(form.get('hourmeterCounter')),
       recordedAt: new Date().toISOString(),
     }
     setRecords((current) => [record, ...current])
@@ -252,6 +253,7 @@ function FuelModule() {
       ficheConso: form.get('ficheConso').trim(),
       liters: Number(form.get('liters')),
       pumpIndex: form.get('pumpIndex') === '' ? null : Number(form.get('pumpIndex')),
+      hourmeterCounter: form.get('hourmeterCounter') === '' ? null : Number(form.get('hourmeterCounter')),
     }
     setRecords((current) => current.map((record) => record.id === editingRecordId ? { ...record, ...changes } : record))
     setEditingRecordId(null)
@@ -405,6 +407,7 @@ function FuelModule() {
           <label>Fiche conso N° <span className="optional">(carnet papier)</span><input name="ficheConso" type="text" placeholder="N° de la fiche" /></label>
           <label>Consommation (litres)<input name="liters" type="number" min="0.01" step="0.01" placeholder="Ex. 120" required /></label>
           <label>Index compteur de la pompe (L) <span className="optional">(facultatif)</span><input name="pumpIndex" type="number" min="0" step="0.01" placeholder="Index affiché par la pompe" /></label>
+          <label>Compteur horaire (h) <span className="optional">(facultatif)</span><input name="hourmeterCounter" type="number" min="0" step="0.1" placeholder="Index horaire de l’engin" /></label>
           <div className="form-actions">{saved && <span className="save-confirmation">✓ Consommation enregistrée</span>}<button type="submit" className="primary-button">＋ Ajouter la consommation</button></div>
         </form>
         {importMessage && <p className="import-message" role="status">{importMessage}</p>}
@@ -443,10 +446,11 @@ function FuelModule() {
             <label>Fiche conso N°<input name="ficheConso" type="text" defaultValue={editingRecord.ficheConso || ''} /></label>
             <label>Consommation (litres)<input name="liters" type="number" min="0.01" step="0.01" defaultValue={editingRecord.liters} required /></label>
             <label>Index compteur de la pompe (L)<input name="pumpIndex" type="number" min="0" step="0.01" defaultValue={editingRecord.pumpIndex ?? ''} /></label>
+            <label>Compteur horaire (h)<input name="hourmeterCounter" type="number" min="0" step="0.1" defaultValue={editingRecord.hourmeterCounter ?? ''} /></label>
             <button type="submit" className="primary-button">Enregistrer les modifications</button>
           </div>
         </form>}
-        {records.length ? <div className="table-scroll"><table><thead><tr><th>Date</th><th>Engin / véhicule</th><th>Chauffeur / responsable</th><th>Fiche conso N°</th><th>Consommation</th><th>Index pompe</th><th>Action</th></tr></thead><tbody>{[...records].sort((a, b) => b.date.localeCompare(a.date) || a.equipment.localeCompare(b.equipment)).map((record) => <tr key={record.id}><td>{new Date(`${record.date}T00:00:00`).toLocaleDateString('fr-TN')}</td><td><strong>{record.equipment}</strong></td><td>{record.driver || '—'}</td><td>{record.ficheConso || '—'}</td><td>{numberFormat.format(record.liters)} L</td><td>{record.pumpIndex == null ? '—' : numberFormat.format(record.pumpIndex) + ' L'}</td><td><button className="edit-asset" onClick={() => setEditingRecordId(record.id)}>Modifier</button></td></tr>)}</tbody></table></div> : <div className="empty-history"><span>◉</span><strong>Aucune consommation enregistrée</strong><p>Importez le CSV ou saisissez une consommation ci-dessus.</p></div>}
+        {records.length ? <div className="table-scroll"><table><thead><tr><th>Date</th><th>Engin / véhicule</th><th>Chauffeur / responsable</th><th>Fiche conso N°</th><th>Consommation</th><th>Index pompe</th><th>Compteur</th><th>Action</th></tr></thead><tbody>{[...records].sort((a, b) => b.date.localeCompare(a.date) || a.equipment.localeCompare(b.equipment)).map((record) => <tr key={record.id}><td>{new Date(`${record.date}T00:00:00`).toLocaleDateString('fr-TN')}</td><td><strong>{record.equipment}</strong></td><td>{record.driver || '—'}</td><td>{record.ficheConso || '—'}</td><td>{numberFormat.format(record.liters)} L</td><td>{record.pumpIndex == null ? '—' : numberFormat.format(record.pumpIndex) + ' L'}</td><td>{record.hourmeterCounter == null ? '—' : numberFormat.format(record.hourmeterCounter) + ' h'}</td><td><button className="edit-asset" onClick={() => setEditingRecordId(record.id)}>Modifier</button></td></tr>)}</tbody></table></div> : <div className="empty-history"><span>◉</span><strong>Aucune consommation enregistrée</strong><p>Importez le CSV ou saisissez une consommation ci-dessus.</p></div>}
       </section>
     </div>
   )
