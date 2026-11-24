@@ -1575,7 +1575,7 @@ function DashboardApp({ session, onLogout, syncStatus, syncError }) {
         </header>
 
         {activePage === 'Carburant' ? <FuelModule /> : activePage === 'Parc matériel' ? <FleetModule /> : activePage === 'Enrochement' ? <EnrochementModule /> : activePage === 'Compteurs horaires' ? <HourMeterModule /> : <div className="page-content">
-          <section className="welcome-row"><div className="welcome-copy"><div><div className="eyebrow">TABLEAU DE BORD</div><h1 className="welcome-heading">Bonjour Chef<span className="welcome-helmet" aria-hidden="true"><img src={`${import.meta.env.BASE_URL}construction-helmet.png`} alt="" /></span></h1><p>Voici le résumé de votre activité aujourd'hui.</p></div><BizerteWeather /></div><button className="primary-button" onClick={() => setActivePage('Rapports')}><span>＋</span> Nouveau rapport</button></section>
+          <section className="welcome-row"><div className="welcome-copy"><div><div className="eyebrow">TABLEAU DE BORD</div><h1 className="welcome-heading">Bonjour Chef<span className="welcome-helmet" aria-hidden="true"><img src={`${import.meta.env.BASE_URL}construction-helmet.png`} alt="" /></span></h1><p>Voici le résumé de votre activité aujourd'hui.</p></div><BizerteWeather /></div></section>
 
           <section className="metric-grid" aria-label="Indicateurs clés">
             <article className="metric-card"><div className="metric-heading"><span>Consommation carburant</span><span className="metric-icon fuel">◉</span></div><div className="metric-value">{new Intl.NumberFormat('fr-TN', { maximumFractionDigits: 0 }).format(currentMonthlyConsumption)} <small>L</small></div><div className="metric-foot"><span className="trend neutral">Mois en cours</span></div></article>
