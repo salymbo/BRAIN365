@@ -309,6 +309,7 @@ function FuelModule() {
   const receivedSinceBaseline = deliveries.filter((delivery) => Date.parse(delivery.recordedAt) >= baselineTime).reduce((sum, delivery) => sum + delivery.liters, 0)
   const usedSinceBaseline = records.filter((record) => !record.sourceFile && record.recordedAt && Date.parse(record.recordedAt) >= baselineTime).reduce((sum, record) => sum + record.liters, 0)
   const currentStock = Math.max(0, reservoirBaseline.liters + receivedSinceBaseline - usedSinceBaseline)
+  const stockLevelClass = currentStock > 6000 ? 'stock-level-high' : currentStock >= 4000 ? 'stock-level-medium' : 'stock-level-low'
   const tankLevel = tankCapacity ? Math.min(100, currentStock / Number(tankCapacity) * 100) : null
   const today = new Date()
   const currentMonthKey = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0')
@@ -333,7 +334,7 @@ function FuelModule() {
       <div className="fuel-title-row"><div><div className="eyebrow">GESTION DES OPÉRATIONS</div><h1>Carburant</h1><p>Consommation quotidienne par engin et historique des saisies.</p></div><span className="local-badge"><i/> Données enregistrées dans ce navigateur</span></div>
       <div className="fuel-summary has-stock">
         {summaryItems.map((item) => (
-          <article className="fuel-summary-card" key={item.label}>
+          <article className={`fuel-summary-card ${item.label.startsWith('Litres restants') ? stockLevelClass : ''}`} key={item.label}>
             <span>{item.label}</span>
             <strong>{item.value === null ? '—' : numberFormat.format(item.value)} {item.unit && item.value !== null && <small>{item.unit}</small>}</strong>
             {item.hint && <small className="summary-hint">{item.hint}</small>}
@@ -348,11 +349,11 @@ function FuelModule() {
         <div className="fuel-dial" role="img" aria-label={tankLevel === null ? `Stock actuel : ${numberFormat.format(currentStock)} litres. Capacité à renseigner.` : `Réservoir à ${numberFormat.format(tankLevel)} pour cent, ${numberFormat.format(currentStock)} litres sur ${numberFormat.format(Number(tankCapacity))}.`}>
           <svg viewBox="0 0 300 175" aria-hidden="true">
             <path className="fuel-dial-track" d="M 38 145 A 112 112 0 0 1 262 145" />
-            <path className={`fuel-dial-fill ${tankLevel !== null && tankLevel <= 15 ? 'low' : ''}`} d="M 38 145 A 112 112 0 0 1 262 145" pathLength="100" strokeDasharray={tankLevel === null ? 0 : tankLevel} />
+            <path className={`fuel-dial-fill ${stockLevelClass}`} d="M 38 145 A 112 112 0 0 1 262 145" pathLength="100" strokeDasharray={tankLevel === null ? 0 : tankLevel} />
             {[0, 25, 50, 75, 100].map((tick) => { const angle = Math.PI - tick / 100 * Math.PI; const x = 150 + Math.cos(angle) * 126; const y = 145 - Math.sin(angle) * 126; return <text key={tick} x={x} y={y} className="fuel-dial-tick">{tick}</text> })}
             {tankLevel !== null && <g transform={`rotate(${-90 + tankLevel * 1.8} 150 145)`}><line x1="150" y1="145" x2="150" y2="47" className="fuel-dial-needle" /><circle cx="150" cy="145" r="6" className="fuel-dial-hub" /></g>}
           </svg>
-          <div className="fuel-dial-reading"><b>{tankLevel === null ? '— %' : `${numberFormat.format(tankLevel)} %`}</b><strong>{numberFormat.format(currentStock)}</strong><span>litres restants</span></div>
+          <div className="fuel-dial-reading"><b>{tankLevel === null ? '— %' : `${numberFormat.format(tankLevel)} %`}</b><strong className={stockLevelClass}>{numberFormat.format(currentStock)}</strong><span>litres restants</span></div>
           <div className="fuel-dial-ends"><span>E · vide</span><span>F · plein</span></div>
           {tankCapacity && <div className="fuel-dial-capacity">Capacité : {numberFormat.format(Number(tankCapacity))} L</div>}
         </div>
@@ -1380,7 +1381,7 @@ function App() {
 
           <section className="metric-grid" aria-label="Indicateurs clés">
             <article className="metric-card"><div className="metric-heading"><span>Consommation carburant</span><span className="metric-icon fuel">◉</span></div><div className="metric-value">{new Intl.NumberFormat('fr-TN', { maximumFractionDigits: 0 }).format(currentMonthlyConsumption)} <small>L</small></div><div className="metric-foot"><span className="trend neutral">Mois en cours</span></div></article>
-            <article className="metric-card"><div className="metric-heading"><span>Reste dans le réservoir</span><span className="metric-icon stock">◉</span></div><div className="metric-value">{numberFormat.format(currentStock)} <small>L</small></div><div className="metric-foot"><span className="trend neutral">Stock calculé</span></div></article>
+            <article className="metric-card"><div className="metric-heading"><span>Reste dans le réservoir</span><span className="metric-icon stock">◉</span></div><div className={`metric-value ${stockLevelClass}`}>{numberFormat.format(currentStock)} <small>L</small></div><div className="metric-foot"><span className="trend neutral">Stock calculé</span></div></article>
             <article className="metric-card"><div className="metric-heading"><span>Dernier index pompe</span><span className="metric-icon pump">↗</span></div><div className="metric-value">{latestPumpIndexRecord ? numberFormat.format(latestPumpIndexRecord.pumpIndex) : '—'} <small>{latestPumpIndexRecord ? 'L' : ''}</small></div><div className="metric-foot"><span>{latestPumpIndexRecord ? new Date(`${latestPumpIndexRecord.date}T00:00:00`).toLocaleDateString('fr-TN') : 'À renseigner'}</span></div></article>
             <article className="metric-card"><div className="metric-heading"><span>Total enrochement</span><span className="metric-icon enrochement">◈</span></div><div className="metric-value">{numberFormat.format(dashboardOverallTonnage)} <small>t</small></div><div className="metric-foot"><span className="trend neutral">Tous types</span></div></article>
             <article className="metric-card"><div className="metric-heading"><span>Total 1/500</span><span className="metric-icon type500">▦</span></div><div className="metric-value">{numberFormat.format(dashboardTypeTotal('1/500'))} <small>t</small></div></article>
