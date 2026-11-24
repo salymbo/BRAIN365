@@ -3,13 +3,25 @@ import './App.css'
 import { applyCloudState, clearCloudSession, importCloudBackup, initializeCloudFromThisDevice, loadCloudState, markCloudWritePending, restoreSession, signIn, startLocalStorageSync } from './cloudSync.js'
 
 const navItems = [
-  { label: 'Vue générale', icon: '◫' },
-  { label: 'Carburant', icon: '◉' },
-  { label: 'Parc matériel', icon: '▦' },
-  { label: 'Enrochement', icon: '◩' },
-  { label: 'Compteurs horaires', icon: '◷' },
-  { label: 'Rapports', icon: '▤' },
+  { label: 'Vue générale', icon: 'dashboard' },
+  { label: 'Carburant', icon: 'fuel' },
+  { label: 'Parc matériel', icon: 'fleet' },
+  { label: 'Enrochement', icon: 'rock' },
+  { label: 'Compteurs horaires', icon: 'clock' },
+  { label: 'Rapports', icon: 'report' },
 ]
+
+function NavIcon({ name }) {
+  const paths = {
+    dashboard: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
+    fuel: <><path d="M4 21V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17" /><path d="M2 21h16M7 6h6v5H7zM16 7h2l3 3v7a2 2 0 0 1-4 0v-4" /></>,
+    fleet: <><path d="M3 15V8h11v7M14 11h4l3 3v1h-7" /><path d="M2 15h2m5 0h5" /><circle cx="6.5" cy="16.5" r="2.5" /><circle cx="17.5" cy="16.5" r="2.5" /><path d="M6 8l2-4h5l2 4" /></>,
+    rock: <><path d="m3 17 4-7 4 4 4-8 6 11H3Z" /><path d="M3 20h18M8 6l2-3 2 3" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /><path d="M12 3v2" /></>,
+    report: <><path d="M6 2h9l4 4v16H6z" /><path d="M14 2v5h5M9 12h7M9 16h7M9 19h5" /></>,
+  }
+  return <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
+}
 
 const weatherDescriptions = { 0: 'Ciel dégagé', 1: 'Peu nuageux', 2: 'Partiellement nuageux', 3: 'Couvert', 45: 'Brouillard', 48: 'Brouillard givrant', 51: 'Bruine légère', 53: 'Bruine', 55: 'Bruine forte', 61: 'Pluie faible', 63: 'Pluie', 65: 'Pluie forte', 80: 'Averses faibles', 81: 'Averses', 82: 'Fortes averses', 95: 'Orage' }
 
@@ -1544,7 +1556,7 @@ function DashboardApp({ session, onLogout, syncStatus, syncError }) {
           <div className="nav-caption">MENU PRINCIPAL</div>
           {navItems.map((item) => (
             <button key={item.label} className={`nav-item ${activePage === item.label ? 'selected' : ''}`} onClick={() => setActivePage(item.label)}>
-              <span className="nav-icon">{item.icon}</span>{item.label}
+              <NavIcon name={item.icon} />{item.label}
               {item.label === 'Rapports' && <span className="nav-arrow">›</span>}
             </button>
           ))}
