@@ -382,16 +382,7 @@ function FuelModule() {
 
   return (
     <div className="fuel-page">
-      <div className="fuel-title-row"><div><div className="eyebrow">GESTION DES OPÉRATIONS</div><h1>Carburant</h1><p>Consommation quotidienne par engin et historique des saisies.</p></div><span className="local-badge"><i/> Données enregistrées dans ce navigateur</span></div>
-      <div className="fuel-summary has-stock">
-        {summaryItems.map((item) => (
-          <article className={`fuel-summary-card ${item.label.startsWith('Litres restants') ? stockLevelClass : ''}`} key={item.label}>
-            <span>{item.label}</span>
-            <strong>{item.value === null ? '—' : numberFormat.format(item.value)} {item.unit && item.value !== null && <small>{item.unit}</small>}</strong>
-            {item.hint && <small className="summary-hint">{item.hint}</small>}
-          </article>
-        ))}
-      </div>
+      <div className="fuel-title-row"><div><div className="eyebrow">GESTION DES OPÉRATIONS</div><h1>Carburant</h1><p>Consommation quotidienne par engin et historique des saisies.</p></div></div>
       <section className="panel fuel-gauge-panel">
         <div className="fuel-gauge-copy"><div className="panel-header"><div><h2>Jauge du réservoir</h2><p>Niveau calculé avec le stock enregistré, les réceptions et les consommations.</p></div></div>
           <label>Capacité réelle du réservoir (L)<input type="number" min="1" step="1" placeholder="À renseigner" value={tankCapacity} onChange={(event) => { const value = event.target.value; setTankCapacity(value === '' ? '' : Number(value)); if (value === '') localStorage.removeItem('sotutrasm-fuel-tank-capacity'); else localStorage.setItem('sotutrasm-fuel-tank-capacity', String(Number(value))) }} /></label>
@@ -409,6 +400,15 @@ function FuelModule() {
           {tankCapacity && <div className="fuel-dial-capacity">Capacité : {numberFormat.format(Number(tankCapacity))} L</div>}
         </div>
       </section>
+      <div className="fuel-summary has-stock">
+        {summaryItems.map((item) => (
+          <article className={`fuel-summary-card ${item.label.startsWith('Litres restants') ? stockLevelClass : ''}`} key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value === null ? '—' : numberFormat.format(item.value)} {item.unit && item.value !== null && <small>{item.unit}</small>}</strong>
+            {item.hint && <small className="summary-hint">{item.hint}</small>}
+          </article>
+        ))}
+      </div>
       {correctionMessage && <div className="stock-reconciliation valid"><span>✓</span>{correctionMessage}</div>}
       {stockSnapshot ? (
         <div className={stockReconciles ? 'stock-reconciliation valid' : 'stock-reconciliation review'}>
