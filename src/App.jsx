@@ -342,6 +342,7 @@ function FuelModule() {
   const receivedSinceBaseline = deliveries.filter((delivery) => Date.parse(delivery.recordedAt) >= baselineTime).reduce((sum, delivery) => sum + delivery.liters, 0)
   const usedSinceBaseline = records.filter((record) => !record.sourceFile && record.recordedAt && Date.parse(record.recordedAt) >= baselineTime).reduce((sum, record) => sum + record.liters, 0)
   const currentStock = Math.max(0, reservoirBaseline.liters + receivedSinceBaseline - usedSinceBaseline)
+  const stockLevelClass = currentStock > 6000 ? 'stock-level-high' : currentStock >= 4000 ? 'stock-level-medium' : 'stock-level-low'
   const tankLevel = tankCapacity ? Math.min(100, currentStock / Number(tankCapacity) * 100) : null
   const today = new Date()
   const currentMonthKey = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0')
@@ -366,7 +367,7 @@ function FuelModule() {
       <div className="fuel-title-row"><div><div className="eyebrow">GESTION DES OPÉRATIONS</div><h1>Carburant</h1><p>Consommation quotidienne par engin et historique des saisies.</p></div><span className="local-badge"><i/> Données enregistrées dans ce navigateur</span></div>
       <div className="fuel-summary has-stock">
         {summaryItems.map((item) => (
-          <article className="fuel-summary-card" key={item.label}>
+          <article className={`fuel-summary-card ${item.label.startsWith('Litres restants') ? stockLevelClass : ''}`} key={item.label}>
             <span>{item.label}</span>
             <strong>{item.value === null ? '—' : numberFormat.format(item.value)} {item.unit && item.value !== null && <small>{item.unit}</small>}</strong>
             {item.hint && <small className="summary-hint">{item.hint}</small>}
@@ -381,11 +382,11 @@ function FuelModule() {
         <div className="fuel-dial" role="img" aria-label={tankLevel === null ? `Stock actuel : ${numberFormat.format(currentStock)} litres. Capacité à renseigner.` : `Réservoir à ${numberFormat.format(tankLevel)} pour cent, ${numberFormat.format(currentStock)} litres sur ${numberFormat.format(Number(tankCapacity))}.`}>
           <svg viewBox="0 0 300 175" aria-hidden="true">
             <path className="fuel-dial-track" d="M 38 145 A 112 112 0 0 1 262 145" />
-            <path className={`fuel-dial-fill ${tankLevel !== null && tankLevel <= 15 ? 'low' : ''}`} d="M 38 145 A 112 112 0 0 1 262 145" pathLength="100" strokeDasharray={tankLevel === null ? 0 : tankLevel} />
+            <path className={`fuel-dial-fill ${stockLevelClass}`} d="M 38 145 A 112 112 0 0 1 262 145" pathLength="100" strokeDasharray={tankLevel === null ? '0 100' : `${tankLevel} 100`} />
             {[0, 25, 50, 75, 100].map((tick) => { const angle = Math.PI - tick / 100 * Math.PI; const x = 150 + Math.cos(angle) * 126; const y = 145 - Math.sin(angle) * 126; return <text key={tick} x={x} y={y} className="fuel-dial-tick">{tick}</text> })}
             {tankLevel !== null && <g transform={`rotate(${-90 + tankLevel * 1.8} 150 145)`}><line x1="150" y1="145" x2="150" y2="47" className="fuel-dial-needle" /><circle cx="150" cy="145" r="6" className="fuel-dial-hub" /></g>}
           </svg>
-          <div className="fuel-dial-reading"><b>{tankLevel === null ? '— %' : `${numberFormat.format(tankLevel)} %`}</b><strong>{numberFormat.format(currentStock)}</strong><span>litres restants</span></div>
+          <div className="fuel-dial-reading"><b>{tankLevel === null ? '— %' : `${numberFormat.format(tankLevel)} %`}</b><strong className={stockLevelClass}>{numberFormat.format(currentStock)}</strong><span>litres restants</span></div>
           <div className="fuel-dial-ends"><span>E · vide</span><span>F · plein</span></div>
           {tankCapacity && <div className="fuel-dial-capacity">Capacité : {numberFormat.format(Number(tankCapacity))} L</div>}
         </div>
@@ -462,11 +463,13 @@ function FuelModule() {
 
 const fleetStorageKey = 'sotutrasm-fleet-assets'
 const assetStatuses = ['En service', 'À l’arrêt', 'En maintenance', 'À confirmer']
+const assetParks = ['Bizerte', 'Sfax', 'Sidi Bousaid', 'Sidi Abdelhamid', 'Monastir']
 const assetAliases = {
   name: ['designation', 'engin', 'vehicule', 'enginvehicule', 'materiel', 'materiels', 'equipment', 'equipement', 'machine', 'asset', 'nom', 'name'],
   reference: ['immatriculation', 'matricule', 'reference', 'ref', 'numero', 'id'],
   category: ['categorie', 'category', 'type', 'typedengin', 'typequipement'],
   responsible: ['responsable', 'chauffeur', 'conducteur', 'affecte', 'affectation', 'operator'],
+  park: ['parc', 'site', 'chantier', 'agence'],
   status: ['etat', 'statut', 'status', 'situation'],
 }
 
@@ -580,6 +583,7 @@ function FleetModule() {
         name: form.get('name').trim(),
         reference: form.get('reference').trim() || '—',
         category: form.get('category'),
+        park: form.get('park') || '',
         responsible: form.get('responsible').trim() || '—',
         status: form.get('status'),
         photo: photoFile?.size ? await resizeAssetPhoto(photoFile) : '',
@@ -602,6 +606,7 @@ function FleetModule() {
         name: form.get('name').trim(),
         reference: form.get('reference').trim() || '—',
         category: form.get('category').trim() || 'À classer',
+        park: form.get('park') || '',
         responsible: form.get('responsible') || '—',
         status: form.get('status'),
         ...(photoFile?.size ? { photo: await resizeAssetPhoto(photoFile) } : {}),
@@ -654,7 +659,7 @@ function FleetModule() {
         if (!name) return null
         const referenceValue = get('reference')
         const reference = /^(-|—|n\/a)$/i.test(referenceValue) ? '—' : referenceValue || '—'
-        return { id: crypto.randomUUID(), name, reference, category: get('category') || 'À classer', responsible: get('responsible') || '—', status: statusFromCsv(get('status')) }
+        return { id: crypto.randomUUID(), name, reference, category: get('category') || 'À classer', park: get('park'), responsible: get('responsible') || '—', status: statusFromCsv(get('status')) }
       }).filter(Boolean)
       if (!imported.length) throw new Error('Aucun engin avec une désignation valide n’a été trouvé.')
       const keys = new Set(assets.map((asset) => normalizeCsvHeader(asset.reference === '—' ? asset.name : asset.reference)))
@@ -678,6 +683,10 @@ function FleetModule() {
     setAssets((current) => current.map((asset) => asset.id === id ? { ...asset, status } : asset))
   }
 
+  function updatePark(id, park) {
+    setAssets((current) => current.map((asset) => asset.id === id ? { ...asset, park } : asset))
+  }
+
   function deleteAsset(id) {
     if (window.confirm('Supprimer cet engin du parc matériel ?')) {
       setAssets((current) => current.filter((asset) => asset.id !== id))
@@ -698,7 +707,7 @@ function FleetModule() {
   try { savedCustomDrivers = JSON.parse(localStorage.getItem('sotutrasm-custom-drivers') || '[]').filter((driver) => typeof driver === 'string') } catch { /* use the standard driver list */ }
   const driverOptions = [...new Set([...defaultFuelDrivers, ...savedCustomDrivers, ...assets.map((asset) => asset.responsible).filter((name) => name && name !== '—')])]
   const filteredAssets = assets.filter((asset) => {
-    const searchText = `${asset.name} ${asset.reference} ${asset.category} ${asset.responsible}`.toLocaleLowerCase('fr')
+    const searchText = `${asset.name} ${asset.reference} ${asset.category} ${asset.park || ''} ${asset.responsible}`.toLocaleLowerCase('fr')
     return searchText.includes(search.toLocaleLowerCase('fr')) && (statusFilter === 'Tous les états' || asset.status === statusFilter)
   }).sort((a, b) => a.name.localeCompare(b.name, 'fr'))
 
@@ -724,13 +733,14 @@ function FleetModule() {
             <label>Désignation<input name="name" defaultValue={editingAsset.name} required /></label>
             <label>Immatriculation / référence<input name="reference" defaultValue={editingAsset.reference === '—' ? '' : editingAsset.reference} /></label>
             <label>Catégorie<input name="category" defaultValue={editingAsset.category} /></label>
+            <label>Parc<select name="park" defaultValue={editingAsset.park || ''} required><option value="" disabled>Choisir un parc</option>{assetParks.map((park) => <option key={park}>{park}</option>)}</select></label>
             <label>Conducteur / responsable<select name="responsible" defaultValue={editingAsset.responsible === '—' ? '' : editingAsset.responsible}><option value="">Choisir un nom (facultatif)</option>{driverOptions.map((driver) => <option key={driver}>{driver}</option>)}</select></label>
             <label>État<select name="status" defaultValue={editingAsset.status}>{assetStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
             <label>Changer la photo <span className="optional">(facultatif)</span><input name="photo" type="file" accept="image/*" /></label>
             <button type="submit" className="primary-button">Enregistrer les modifications</button>
           </div>
         </form>}
-        {filteredAssets.length ? <div className="table-scroll"><table><thead><tr><th>Désignation</th><th>Référence</th><th>Catégorie</th><th>Responsable</th><th>État</th><th>Action</th></tr></thead><tbody>{filteredAssets.map((asset) => { const photo = asset.photo || fleetPhotoForName(asset.name); return <tr key={asset.id}><td><div className="asset-designation"><button type="button" className="asset-photo-button" onClick={() => setSelectedAssetId(asset.id)} aria-label={`Ouvrir la fiche identité de ${asset.name}`}>{photo ? <img src={photo} alt={`Photo de ${asset.name}`} /> : <span className="asset-photo-placeholder">▦</span>}</button><strong>{asset.name}</strong></div></td><td>{asset.reference}</td><td>{asset.category}</td><td>{asset.responsible}</td><td><select className={`status-select ${asset.status === 'En service' ? 'status-active' : asset.status === 'En maintenance' ? 'status-maintenance' : asset.status === 'À l’arrêt' ? 'status-stopped' : 'status-pending'}`} aria-label={`État de ${asset.name}`} value={asset.status} onChange={(event) => updateStatus(asset.id, event.target.value)}>{assetStatuses.map((status) => <option key={status}>{status}</option>)}</select></td><td><div className="asset-actions"><button className="edit-asset" onClick={() => setEditingId(asset.id)}>Modifier</button><button className="delete-asset" onClick={() => deleteAsset(asset.id)} aria-label={`Supprimer ${asset.name}`}>Supprimer</button></div></td></tr>})}</tbody></table></div> : <div className="empty-history"><span>▦</span><strong>{assets.length ? 'Aucun résultat' : 'Votre parc est encore vide'}</strong><p>{assets.length ? 'Modifiez la recherche ou le filtre d’état.' : 'Ajoutez un engin avec le formulaire ci-dessous pour commencer.'}</p></div>}
+        {filteredAssets.length ? <div className="table-scroll"><table><thead><tr><th>Désignation</th><th>Parc</th><th>Référence</th><th>Catégorie</th><th>Responsable</th><th>État</th><th>Action</th></tr></thead><tbody>{filteredAssets.map((asset) => { const photo = asset.photo || fleetPhotoForName(asset.name); return <tr key={asset.id}><td><div className="asset-designation"><button type="button" className="asset-photo-button" onClick={() => setSelectedAssetId(asset.id)} aria-label={`Ouvrir la fiche identité de ${asset.name}`}>{photo ? <img src={photo} alt={`Photo de ${asset.name}`} /> : <span className="asset-photo-placeholder">▦</span>}</button><strong>{asset.name}</strong></div></td><td><select className="park-select" aria-label={`Parc de ${asset.name}`} value={asset.park || ''} onChange={(event) => updatePark(asset.id, event.target.value)}><option value="">Choisir un parc</option>{assetParks.map((park) => <option key={park}>{park}</option>)}</select></td><td>{asset.reference}</td><td>{asset.category}</td><td>{asset.responsible}</td><td><select className={`status-select ${asset.status === 'En service' ? 'status-active' : asset.status === 'En maintenance' ? 'status-maintenance' : asset.status === 'À l’arrêt' ? 'status-stopped' : 'status-pending'}`} aria-label={`État de ${asset.name}`} value={asset.status} onChange={(event) => updateStatus(asset.id, event.target.value)}>{assetStatuses.map((status) => <option key={status}>{status}</option>)}</select></td><td><div className="asset-actions"><button className="edit-asset" onClick={() => setEditingId(asset.id)}>Modifier</button><button className="delete-asset" onClick={() => deleteAsset(asset.id)} aria-label={`Supprimer ${asset.name}`}>Supprimer</button></div></td></tr>})}</tbody></table></div> : <div className="empty-history"><span>▦</span><strong>{assets.length ? 'Aucun résultat' : 'Votre parc est encore vide'}</strong><p>{assets.length ? 'Modifiez la recherche ou le filtre d’état.' : 'Ajoutez un engin avec le formulaire ci-dessous pour commencer.'}</p></div>}
       </section>
       <section className="panel fleet-form-panel">
         <div className="panel-header"><div><h2>Ajouter un engin</h2><p>Ajoutez un engin manuellement ou importez une liste CSV.</p></div><label className="import-button">Importer un CSV<input type="file" accept=".csv,text/csv" onChange={importFleetCsv} /></label></div>
@@ -738,6 +748,7 @@ function FleetModule() {
           <label>Désignation<input name="name" placeholder="Ex. Pelle 03" required /></label>
           <label>Immatriculation / référence<input name="reference" placeholder="Ex. TU 1234" /></label>
           <label>Catégorie<select name="category" defaultValue="Engin de chantier"><option>Engin de chantier</option><option>Camion</option><option>Véhicule</option><option>Groupe électrogène</option><option>Compresseur</option><option>Autre</option></select></label>
+          <label>Parc<select name="park" defaultValue="" required><option value="" disabled>Choisir un parc</option>{assetParks.map((park) => <option key={park}>{park}</option>)}</select></label>
           <label>Conducteur / responsable<select name="responsible" defaultValue=""><option value="">Choisir un nom (facultatif)</option>{driverOptions.map((driver) => <option key={driver}>{driver}</option>)}</select></label>
           <label>État<select name="status" defaultValue="À confirmer">{assetStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
           <label>Photo de l’engin <span className="optional">(facultatif)</span><input name="photo" type="file" accept="image/*" /></label>
@@ -746,7 +757,7 @@ function FleetModule() {
         {message && <p className="import-message" role="status">{message}</p>}
         {importMessage && <p className="import-message" role="status">{importMessage}</p>}
       </section>
-      {selectedAsset && <div className="identity-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) setSelectedAssetId(null) }}><article className="identity-card" role="dialog" aria-modal="true" aria-labelledby="identity-title"><button type="button" className="identity-close" aria-label="Fermer la fiche" onClick={() => setSelectedAssetId(null)}>×</button><div className="eyebrow">FICHE IDENTITÉ DE L’ENGIN</div><h2 id="identity-title">{selectedAsset.name}</h2>{selectedAssetPhoto && <img className="identity-photo" src={selectedAssetPhoto} alt={`Photo de ${selectedAsset.name}`} />}<section><h3>Informations du parc</h3><dl className="identity-details"><div><dt>Immatriculation / référence</dt><dd>{selectedIdentityReference}</dd></div><div><dt>Catégorie</dt><dd>{selectedIdentityCategory}</dd></div><div><dt>Conducteur / responsable</dt><dd>{selectedAsset.responsible && selectedAsset.responsible !== '—' ? selectedAsset.responsible : selectedIdentityValue('Responsable / conducteur') || '—'}</dd></div><div><dt>État</dt><dd>{selectedAsset.status || 'À confirmer'}</dd></div></dl></section>{selectedIdentityDetails.length > 0 ? <section className="identity-technical"><h3>Caractéristiques et détails techniques</h3><dl className="identity-details">{selectedIdentityDetails.filter(([label]) => !['Responsable / conducteur', 'Immatriculation', 'Type d’engin'].includes(label)).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section> : <p className="identity-missing-details">Aucune fiche technique correspondante n’a été identifiée dans le classeur fourni.</p>}</article></div>}
+      {selectedAsset && <div className="identity-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) setSelectedAssetId(null) }}><article className="identity-card" role="dialog" aria-modal="true" aria-labelledby="identity-title"><button type="button" className="identity-close" aria-label="Fermer la fiche" onClick={() => setSelectedAssetId(null)}>×</button><div className="eyebrow">FICHE IDENTITÉ DE L’ENGIN</div><h2 id="identity-title">{selectedAsset.name}</h2>{selectedAssetPhoto && <img className="identity-photo" src={selectedAssetPhoto} alt={`Photo de ${selectedAsset.name}`} />}<section><h3>Informations du parc</h3><dl className="identity-details"><div><dt>Immatriculation / référence</dt><dd>{selectedIdentityReference}</dd></div><div><dt>Catégorie</dt><dd>{selectedIdentityCategory}</dd></div><div><dt>Parc</dt><dd>{selectedAsset.park || '—'}</dd></div><div><dt>Conducteur / responsable</dt><dd>{selectedAsset.responsible && selectedAsset.responsible !== '—' ? selectedAsset.responsible : selectedIdentityValue('Responsable / conducteur') || '—'}</dd></div><div><dt>État</dt><dd>{selectedAsset.status || 'À confirmer'}</dd></div></dl></section>{selectedIdentityDetails.length > 0 ? <section className="identity-technical"><h3>Caractéristiques et détails techniques</h3><dl className="identity-details">{selectedIdentityDetails.filter(([label]) => !['Responsable / conducteur', 'Immatriculation', 'Type d’engin'].includes(label)).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section> : <p className="identity-missing-details">Aucune fiche technique correspondante n’a été identifiée dans le classeur fourni.</p>}</article></div>}
     </div>
   )
 }
@@ -1355,7 +1366,7 @@ function CloudLogin({ onSuccess }) {
   return (
     <main className="demo-login-screen">
       <form className="demo-login-card" onSubmit={submit}>
-        <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN 365</span></div></div>
+        <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN365</span></div></div>
         <div className="demo-login-eyebrow">ESPACE DE TRAVAIL PARTAGÉ</div>
         <h1>Connexion</h1>
         <p className="demo-login-intro">Connecte-toi pour accéder aux données partagées de SOTUTRASM BRAIN 365.</p>
@@ -1378,7 +1389,7 @@ function CloudBootstrap({ session, onInitialized, onLogout }) {
     try { await initializeCloudFromThisDevice(session); await onInitialized() } catch (cause) { setError(cause.message || 'Initialisation impossible.') } finally { setBusy(false) }
   }
   return <main className="demo-login-screen"><section className="demo-login-card cloud-bootstrap-card">
-    <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN 365</span></div></div>
+    <div className="demo-login-brand"><img src={`${import.meta.env.BASE_URL}headerlogo.png`} alt="Logo SOTUTRASM" /><div><strong>SOTUTRASM</strong><span>BRAIN365</span></div></div>
     <div className="demo-login-eyebrow">INITIALISATION DU PARTAGE</div><h1>Aucune donnée partagée</h1>
     <p className="demo-login-intro">Le compte est connecté, mais l’espace Supabase est encore vide. Depuis le PC qui contient les données de référence, clique ci-dessous pour envoyer les données de gestion de ce navigateur dans l’espace partagé.</p>
     <button type="button" onClick={initialize} disabled={busy}>{busy ? 'Initialisation…' : 'Initialiser avec les données de ce PC'}</button>
@@ -1455,6 +1466,7 @@ function DashboardApp({ session, onLogout, syncStatus }) {
   const baselineTime = Number.isFinite(parsedBaselineTime) ? parsedBaselineTime : Date.now()
   const currentMonthlyConsumption = Number(dashboardBaseline.monthlyConsumption?.[currentMonthKey] ?? confirmedMonthlyFuelTotals[currentMonthKey] ?? 0) + dashboardRecords.filter((record) => !record.sourceFile && record.date?.startsWith(currentMonthKey) && record.recordedAt && Date.parse(record.recordedAt) >= baselineTime).reduce((sum, record) => sum + Number(record.liters || 0), 0)
   const currentStock = Math.max(0, Number(dashboardBaseline.liters || 0) + dashboardDeliveries.filter((delivery) => Date.parse(delivery.recordedAt) >= baselineTime).reduce((sum, delivery) => sum + Number(delivery.liters || 0), 0) - dashboardRecords.filter((record) => !record.sourceFile && record.recordedAt && Date.parse(record.recordedAt) >= baselineTime).reduce((sum, record) => sum + Number(record.liters || 0), 0))
+  const stockLevelClass = currentStock > 6000 ? 'stock-level-high' : currentStock >= 4000 ? 'stock-level-medium' : 'stock-level-low'
   const latestPumpIndexRecord = [...dashboardRecords].filter((record) => record.pumpIndex !== null && record.pumpIndex !== '' && Number.isFinite(Number(record.pumpIndex))).sort((a, b) => b.date.localeCompare(a.date) || Date.parse(b.recordedAt || 0) - Date.parse(a.recordedAt || 0))[0]
   const numberFormat = new Intl.NumberFormat('fr-TN', { maximumFractionDigits: 3 })
   const dashboardTypeTotal = (type) => Number(enrochementBeforeAugust2026Tonnes[type] || 0) + dashboardEnrochementRecords.filter((record) => normalizeEnrochementType(record.type) === type).reduce((sum, record) => sum + Number(record.tonnageKg || 0), 0) / 1000
@@ -1513,11 +1525,11 @@ function DashboardApp({ session, onLogout, syncStatus }) {
         </header>
 
         {activePage === 'Carburant' ? <FuelModule /> : activePage === 'Parc matériel' ? <FleetModule /> : activePage === 'Enrochement' ? <EnrochementModule /> : activePage === 'Compteurs horaires' ? <HourMeterModule /> : <div className="page-content">
-          <section className="welcome-row"><div className="welcome-copy"><div><div className="eyebrow">TABLEAU DE BORD</div><h1>Bonjour, Salim</h1><p>Voici le résumé de votre activité aujourd'hui.</p></div><BizerteWeather /></div><button className="primary-button" onClick={() => setActivePage('Rapports')}><span>＋</span> Nouveau rapport</button></section>
+          <section className="welcome-row"><div className="welcome-copy"><div><div className="eyebrow">TABLEAU DE BORD</div><h1>Bonjour Chef</h1><p>Voici le résumé de votre activité aujourd'hui.</p></div><BizerteWeather /></div><button className="primary-button" onClick={() => setActivePage('Rapports')}><span>＋</span> Nouveau rapport</button></section>
 
           <section className="metric-grid" aria-label="Indicateurs clés">
             <article className="metric-card"><div className="metric-heading"><span>Consommation carburant</span><span className="metric-icon fuel">◉</span></div><div className="metric-value">{new Intl.NumberFormat('fr-TN', { maximumFractionDigits: 0 }).format(currentMonthlyConsumption)} <small>L</small></div><div className="metric-foot"><span className="trend neutral">Mois en cours</span></div></article>
-            <article className="metric-card"><div className="metric-heading"><span>Reste dans le réservoir</span><span className="metric-icon stock">◉</span></div><div className="metric-value">{numberFormat.format(currentStock)} <small>L</small></div><div className="metric-foot"><span className="trend neutral">Stock calculé</span></div></article>
+            <article className="metric-card"><div className="metric-heading"><span>Reste dans le réservoir</span><span className="metric-icon stock">◉</span></div><div className={`metric-value ${stockLevelClass}`}>{numberFormat.format(currentStock)} <small>L</small></div><div className="metric-foot"><span className="trend neutral">Stock calculé</span></div></article>
             <article className="metric-card"><div className="metric-heading"><span>Dernier index pompe</span><span className="metric-icon pump">↗</span></div><div className="metric-value">{latestPumpIndexRecord ? numberFormat.format(latestPumpIndexRecord.pumpIndex) : '—'} <small>{latestPumpIndexRecord ? 'L' : ''}</small></div><div className="metric-foot"><span>{latestPumpIndexRecord ? new Date(`${latestPumpIndexRecord.date}T00:00:00`).toLocaleDateString('fr-TN') : 'À renseigner'}</span></div></article>
             <article className="metric-card"><div className="metric-heading"><span>Total enrochement</span><span className="metric-icon enrochement">◈</span></div><div className="metric-value">{numberFormat.format(dashboardOverallTonnage)} <small>t</small></div><div className="metric-foot"><span className="trend neutral">Tous types</span></div></article>
             <article className="metric-card"><div className="metric-heading"><span>Total 1/500</span><span className="metric-icon type500">▦</span></div><div className="metric-value">{numberFormat.format(dashboardTypeTotal('1/500'))} <small>t</small></div></article>
