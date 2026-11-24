@@ -694,7 +694,9 @@ function FleetModule() {
   const selectedIdentityValue = (label) => selectedIdentityDetails.find(([field]) => field === label)?.[1]
   const selectedIdentityReference = selectedAsset?.reference && selectedAsset.reference !== '—' ? selectedAsset.reference : selectedIdentityValue('Immatriculation') || selectedIdentityValue('N° de parc') || '—'
   const selectedIdentityCategory = selectedAsset?.category && selectedAsset.category !== 'À classer' ? selectedAsset.category : selectedIdentityValue('Type d’engin') || '—'
-  const driverOptions = [...new Set([...defaultFuelDrivers, ...assets.map((asset) => asset.responsible).filter((name) => name && name !== '—')])]
+  let savedCustomDrivers = []
+  try { savedCustomDrivers = JSON.parse(localStorage.getItem('sotutrasm-custom-drivers') || '[]').filter((driver) => typeof driver === 'string') } catch { /* use the standard driver list */ }
+  const driverOptions = [...new Set([...defaultFuelDrivers, ...savedCustomDrivers, ...assets.map((asset) => asset.responsible).filter((name) => name && name !== '—')])]
   const filteredAssets = assets.filter((asset) => {
     const searchText = `${asset.name} ${asset.reference} ${asset.category} ${asset.responsible}`.toLocaleLowerCase('fr')
     return searchText.includes(search.toLocaleLowerCase('fr')) && (statusFilter === 'Tous les états' || asset.status === statusFilter)
