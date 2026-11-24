@@ -450,7 +450,8 @@ const fleetPhotoCatalog = [
 
 function fleetPhotoForName(name) {
   const normalizedName = normalizeCsvHeader(name || '')
-  return fleetPhotoCatalog.find(({ aliases }) => aliases.some((alias) => normalizedName.includes(normalizeCsvHeader(alias))))?.src || ''
+  const photo = fleetPhotoCatalog.find(({ aliases }) => aliases.some((alias) => normalizedName.includes(normalizeCsvHeader(alias))))?.src
+  return photo ? `${import.meta.env.BASE_URL}${photo.replace(/^\//, '')}` : ''
 }
 
 const fleetIdentityCatalog = [
