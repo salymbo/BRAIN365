@@ -99,3 +99,4 @@ nav { margin-top:35px; }.nav-caption { margin-bottom:11px; }.nav-item { width:10
 .fuel-dial-fill.stock-level-medium {stroke:#d6861d}
 .fuel-dial-fill.stock-level-low {stroke:#c93434}
 .fuel-summary-card.stock-level-high strong small,.fuel-summary-card.stock-level-medium strong small,.fuel-summary-card.stock-level-low strong small,.metric-value.stock-level-high small,.metric-value.stock-level-medium small,.metric-value.stock-level-low small {color:inherit}
+.park-select {max-width:150px;padding:6px 8px;border:1px solid #e3e8ef;border-radius:6px;background:#fff;color:#52637a;font:500 10px 'DM Sans',sans-serif}
